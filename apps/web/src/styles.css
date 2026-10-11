@@ -1255,28 +1255,58 @@ textarea:focus {
   right: 0;
   bottom: 0;
   left: 0;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.13);
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  outline: 0;
+  background:
+    linear-gradient(
+      to right,
+      var(--cyan) 0 var(--progress, 0%),
+      rgba(255, 255, 255, 0.18) var(--progress, 0%) 100%
+    );
 }
 
-.progress-track span {
-  position: relative;
-  display: block;
-  height: 100%;
-  background: var(--cyan);
+.progress-track:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
-.progress-track span::after {
-  position: absolute;
-  top: 50%;
-  right: -6px;
-  width: 12px;
-  height: 12px;
+.progress-track::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.progress-track::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -3.5px;
+  appearance: none;
+  border: 0;
   border-radius: 50%;
-  background: white;
+  background: #fff;
   box-shadow: 0 0 14px var(--cyan);
-  content: "";
-  transform: translateY(-50%);
+}
+
+.progress-track::-moz-range-track {
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.progress-track::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px var(--cyan);
 }
 
 .feed-message {
@@ -1673,8 +1703,8 @@ textarea:focus {
 .messages-list-wrap {
   display: grid;
   gap: 14px;
-  min-height: 360px;
-  padding: 18px;
+  min-height: 220px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
   background: rgba(31, 31, 33, 0.78);
@@ -1682,21 +1712,21 @@ textarea:focus {
 
 .messages-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .message-item {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   min-width: 0;
-  padding: 14px;
+  padding: 10px 12px;
   color: var(--text);
   text-align: left;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
@@ -1719,12 +1749,16 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.message-icon .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .message-icon.active {
@@ -1735,7 +1769,7 @@ textarea:focus {
 
 .message-copy {
   display: grid;
-  gap: 7px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1749,7 +1783,7 @@ textarea:focus {
 .message-title-row strong {
   overflow: hidden;
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1770,8 +1804,8 @@ textarea:focus {
 }
 
 .message-actor-row img {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   flex: 0 0 auto;
   border: 1px solid var(--line);
   border-radius: 50%;
@@ -1782,7 +1816,7 @@ textarea:focus {
 .message-actor-row strong {
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -1792,17 +1826,17 @@ textarea:focus {
 .message-content-text {
   overflow: hidden;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .message-state {
-  min-width: 56px;
+  min-width: 48px;
   justify-self: end;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   text-align: right;
 }

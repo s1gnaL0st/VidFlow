@@ -1212,10 +1212,15 @@ function VideoStage({
   const videoRef = useRef(null);
   const itemRef = useRef(item);
   const qosRef = useRef(createVideoQoSState(item.video_id));
+  const [playback, setPlayback] = useState({ currentTime: 0, duration: 0 });
 
   useEffect(() => {
     itemRef.current = item;
   }, [item]);
+
+  useEffect(() => {
+    setPlayback({ currentTime: 0, duration: 0 });
+  }, [item.video_id]);
 
   const flushQoS = useCallback(() => {
     const state = qosRef.current;
@@ -1281,6 +1286,26 @@ function VideoStage({
     state.stutterCount += 1;
   }
 
+  function syncPlaybackTime(video) {
+    if (!video) return;
+    setPlayback((current) => ({
+      ...current,
+      currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+      duration: Number.isFinite(video.duration) ? video.duration : current.duration
+    }));
+  }
+
+  function handleSeek(event) {
+    const video = videoRef.current;
+    const nextTime = Number(event.target.value);
+    if (!video || !Number.isFinite(nextTime)) return;
+    video.currentTime = nextTime;
+    setPlayback((current) => ({ ...current, currentTime: nextTime }));
+  }
+
+  const progressPercent =
+    playback.duration > 0 ? Math.min(100, Math.max(0, (playback.currentTime / playback.duration) * 100)) : 0;
+
   return (
     <article className="video-stage">
       <img className="stage-backdrop" src={cover} alt="" />
@@ -1297,6 +1322,10 @@ function VideoStage({
           playsInline
           preload={active ? "metadata" : "none"}
           onLoadedData={handleLoadedData}
+          onLoadedMetadata={() => syncPlaybackTime(videoRef.current)}
+          onDurationChange={() => syncPlaybackTime(videoRef.current)}
+          onTimeUpdate={() => syncPlaybackTime(videoRef.current)}
+          onSeeked={() => syncPlaybackTime(videoRef.current)}
           onPlaying={handlePlaying}
           onWaiting={handleWaiting}
           onPause={flushQoS}
@@ -1330,9 +1359,18 @@ function VideoStage({
         <ActionButton icon="bookmark" label={formatMetric(item.favorite_count)} active={favorited} onClick={onFavorite} />
         <ActionButton icon="share" label="" compact />
       </div>
-      <div className="progress-track">
-        <span style={{ width: "34%" }} />
-      </div>
+      <input
+        className="progress-track"
+        type="range"
+        min="0"
+        max={playback.duration || 0}
+        step="0.01"
+        value={Math.min(playback.currentTime, playback.duration || 0)}
+        disabled={!showVideo || playback.duration <= 0}
+        aria-label="视频进度"
+        onChange={handleSeek}
+        style={{ "--progress": `${progressPercent}%` }}
+      />
     </article>
   );
 }
