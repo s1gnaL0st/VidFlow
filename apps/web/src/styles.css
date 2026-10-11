@@ -693,7 +693,7 @@ textarea:focus {
   width: min(100%, 560px);
 }
 
-.search-box span {
+.search-box > .material-symbols-outlined {
   position: absolute;
   top: 50%;
   left: 13px;
@@ -707,6 +707,68 @@ textarea:focus {
   border-color: transparent;
   border-radius: 999px;
   background: var(--surface-mid);
+}
+
+.search-results {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(24, 24, 27, 0.98);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+}
+
+.search-results button {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  color: var(--text);
+  text-align: left;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.search-results button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.search-results img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.search-results button > span {
+  min-width: 0;
+}
+
+.search-results strong,
+.search-results small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results small,
+.search-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.search-empty {
+  padding: 12px;
 }
 
 .top-actions {

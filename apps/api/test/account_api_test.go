@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
+	"strings"
 	"sync"
 	"testing"
 
@@ -101,6 +103,28 @@ func (r *memoryAccountRepo) FindByID(ctx context.Context, id int64) (*domainacco
 		return nil, domainaccount.ErrUserNotFound
 	}
 	return cloneUser(user), nil
+}
+
+// Search 模拟账号和昵称模糊搜索。
+func (r *memoryAccountRepo) Search(ctx context.Context, keyword string, excludeUserID int64, limit int) ([]*domainaccount.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	keyword = strings.ToLower(strings.TrimSpace(keyword))
+	items := []*domainaccount.User{}
+	for id, user := range r.byID {
+		if id == excludeUserID || user.Status != domainaccount.StatusNormal {
+			continue
+		}
+		if strings.Contains(strings.ToLower(user.Account), keyword) || strings.Contains(strings.ToLower(user.Nickname), keyword) {
+			items = append(items, cloneUser(user))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ID > items[j].ID })
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 // UpdateProfile 只更新资料字段，与真实仓储保持同样的行为边界。
@@ -308,6 +332,30 @@ func registerAndLogin(t *testing.T, router *gin.Engine) string {
 	return token.AccessToken
 }
 
+func TestAccountSearchAPI(t *testing.T) {
+	router := newAccountRouter(t)
+	for _, body := range []string{
+		`{"account":"alice_demo","password":"12345678","nickname":"Alice"}`,
+		`{"account":"bob_demo","password":"12345678","nickname":"Bob"}`,
+	} {
+		response := performJSONRequest(router, http.MethodPost, "/api/users", body, "")
+		requireStatus(t, response, http.StatusCreated)
+	}
+
+	response := performJSONRequest(router, http.MethodGet, "/api/users/search?q=alice", "", "")
+	requireStatus(t, response, http.StatusOK)
+	var payload struct {
+		Items []struct {
+			ID       int64  `json:"id"`
+			Nickname string `json:"nickname"`
+		} `json:"items"`
+	}
+	decodeJSON(t, response, &payload)
+	if len(payload.Items) != 1 || payload.Items[0].Nickname != "Alice" {
+		t.Fatalf("unexpected search response: %+v", payload)
+	}
+}
+
 // newAccountRouter 只装配账号相关路由，使测试聚焦账号模块。
 func newAccountRouter(t *testing.T) *gin.Engine {
 	router, _ := newAccountRouterWithRepo(t)
@@ -339,6 +387,7 @@ func newAccountRouterWithRepo(t *testing.T) (*gin.Engine, *memoryAccountRepo) {
 	users.POST("", handler.Register)
 	users.GET("/me", authMiddleware, handler.Me)
 	users.PATCH("/me", authMiddleware, handler.UpdateMe)
+	users.GET("/search", handler.Search)
 	users.GET("/:userId", handler.Get)
 
 	return router, repo

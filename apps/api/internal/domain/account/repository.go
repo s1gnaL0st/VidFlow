@@ -10,6 +10,8 @@ type Repository interface {
 	FindByAccount(ctx context.Context, account string) (*User, error)
 	// FindByID 用于根据登录态读取当前用户。
 	FindByID(ctx context.Context, id int64) (*User, error)
+	// Search 按账号或昵称搜索正常状态的用户。
+	Search(ctx context.Context, keyword string, excludeUserID int64, limit int) ([]*User, error)
 	// UpdateProfile 只更新用户展示资料字段。
 	UpdateProfile(ctx context.Context, user *User) error
 }

@@ -165,6 +165,7 @@ func Register(g *gin.Engine, cfg *infraconfig.Config, db *sql.DB) error {
 	users.DELETE("/me/following/:targetUserId", authMiddleware, relationHandler.Unfollow)
 	users.GET("/me/following", authMiddleware, relationHandler.ListFollowing)
 	users.GET("/me/followers", authMiddleware, relationHandler.ListFollowers)
+	users.GET("/search", optionalAuthMiddleware, accountHandler.Search)
 	users.GET("/:userId", accountHandler.Get)
 	users.GET("/:userId/videos", videoHandler.ListByAuthor)
 

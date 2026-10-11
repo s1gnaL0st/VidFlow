@@ -118,6 +118,29 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, publicProfileResponse(profile))
 }
 
+// Search 按账号或昵称搜索用户，用于顶部全局搜索。
+func (h *Handler) Search(c *gin.Context) {
+	limit, err := parseSearchLimit(c.Query("limit"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var excludeUserID int64
+	if userID, ok := userIDFromContext(c); ok {
+		excludeUserID = userID
+	}
+	profiles, err := h.service.SearchProfiles(c.Request.Context(), c.Query("q"), excludeUserID, limit)
+	if err != nil {
+		writeProfileError(c, err)
+		return
+	}
+	items := make([]publicUserProfileResponse, 0, len(profiles))
+	for _, profile := range profiles {
+		items = append(items, publicProfileResponse(profile))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
 // UpdateMe 更新当前登录用户资料，请求体支持部分字段更新。
 func (h *Handler) UpdateMe(c *gin.Context) {
 	userID, ok := userIDFromContext(c)
@@ -186,6 +209,18 @@ func parsePositiveUserID(raw string) (int64, error) {
 		return 0, domainaccount.ErrInvalidUserID
 	}
 	return value, nil
+}
+
+func parseSearchLimit(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit <= 0 {
+		return 0, domainaccount.ErrInvalidUserID
+	}
+	return limit, nil
 }
 
 // writeProfileError 统一账号资料相关接口的错误响应。

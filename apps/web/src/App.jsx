@@ -362,6 +362,46 @@ function AppShell({ children, user, route, authenticated, unreadCount, onNavigat
 }
 
 function TopNav({ user, authenticated, unreadCount, onNavigate, onLogout }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchState, setSearchState] = useState("idle");
+
+  useEffect(() => {
+    const keyword = searchQuery.trim();
+    if (!keyword) {
+      setSearchResults([]);
+      setSearchState("idle");
+      return undefined;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setSearchState("loading");
+      apiRequest(`/api/users/search?q=${encodeURIComponent(keyword)}&limit=8`)
+        .then((data) => {
+          if (!active) return;
+          setSearchResults(Array.isArray(data.items) ? data.items : []);
+          setSearchState("ready");
+        })
+        .catch(() => {
+          if (active) {
+            setSearchResults([]);
+            setSearchState("error");
+          }
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  function selectUser(userID) {
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchState("idle");
+    onNavigate(`/users/${userID}`);
+  }
+
   return (
     <header className="top-nav">
       <div className="top-left">
@@ -370,10 +410,40 @@ function TopNav({ user, authenticated, unreadCount, onNavigate, onLogout }) {
         </button>
       </div>
       <div className="top-center">
-        <label className="search-box">
+        <div className="search-box">
           <span className="material-symbols-outlined">search</span>
-          <input placeholder="搜索" />
-        </label>
+          <input
+            value={searchQuery}
+            placeholder="搜索用户"
+            aria-label="搜索用户"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && searchResults.length > 0) {
+                event.preventDefault();
+                selectUser(searchResults[0].id);
+              }
+              if (event.key === "Escape") {
+                setSearchQuery("");
+              }
+            }}
+          />
+          {searchQuery.trim() && (
+            <span className="search-results">
+              {searchState === "loading" && <span className="search-empty">搜索中...</span>}
+              {searchState === "error" && <span className="search-empty">搜索失败</span>}
+              {searchState === "ready" && searchResults.length === 0 && <span className="search-empty">没有找到用户</span>}
+              {searchResults.map((result) => (
+                <button key={result.id} type="button" onClick={() => selectUser(result.id)}>
+                  <img src={result.avatar_url || image.currentUser} alt="" />
+                  <span>
+                    <strong>{result.nickname || `用户_${result.id}`}</strong>
+                    <small>{result.bio || "查看用户主页"}</small>
+                  </span>
+                </button>
+              ))}
+            </span>
+          )}
+        </div>
       </div>
       <div className="top-actions">
         <button className="upload-button" onClick={() => onNavigate(authenticated ? "/upload" : "/auth")}>

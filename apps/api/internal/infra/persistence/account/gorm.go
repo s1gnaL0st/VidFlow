@@ -4,14 +4,12 @@ import (
 	domainaccount "GCFeed/internal/domain/account"
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
-
-type Repository struct {
-	db *gorm.DB
-}
 
 type userWithStatModel struct {
 	ID             int64
@@ -25,6 +23,9 @@ type userWithStatModel struct {
 	FollowingCount int
 	FollowerCount  int
 	WorkCount      int
+}
+type Repository struct {
+	db *gorm.DB
 }
 
 // New 创建账号仓储实现，db 由路由装配阶段注入。
@@ -100,6 +101,45 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*domainaccount.Use
 	}
 
 	return restoreUser(user), nil
+}
+
+// Search 按账号或昵称模糊搜索正常用户。
+func (r *Repository) Search(ctx context.Context, keyword string, excludeUserID int64, limit int) ([]*domainaccount.User, error) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" || limit <= 0 {
+		return []*domainaccount.User{}, nil
+	}
+	pattern := "%" + keyword + "%"
+	query := r.db.WithContext(ctx).
+		Table("account AS a").
+		Select(userWithStatSelect()).
+		Joins("LEFT JOIN user_relation_stat AS rs ON rs.user_id = a.id").
+		Joins("LEFT JOIN (SELECT user_id, COUNT(*) AS following_count FROM user_follow WHERE status = 1 GROUP BY user_id) AS active_following ON active_following.user_id = a.id").
+		Joins("LEFT JOIN (SELECT target_user_id, COUNT(*) AS follower_count FROM user_follow WHERE status = 1 GROUP BY target_user_id) AS active_followers ON active_followers.target_user_id = a.id").
+		Joins("LEFT JOIN (SELECT author_id, COUNT(*) AS work_count FROM video WHERE status = 2 GROUP BY author_id) AS published_works ON published_works.author_id = a.id").
+		Where("a.status = ?", domainaccount.StatusNormal).
+		Where("(a.account LIKE ? OR a.nickname LIKE ?)", pattern, pattern)
+	if excludeUserID > 0 {
+		query = query.Where("a.id <> ?", excludeUserID)
+	}
+	var users []userWithStatModel
+	err := query.
+		Order(clause.Expr{
+			SQL:  "CASE WHEN a.account = ? THEN 0 WHEN a.nickname = ? THEN 1 ELSE 2 END",
+			Vars: []interface{}{keyword, keyword},
+		}).
+		Order("a.id DESC").
+		Limit(limit).
+		Scan(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*domainaccount.User, 0, len(users))
+	for _, user := range users {
+		items = append(items, restoreUser(user))
+	}
+	return items, nil
 }
 
 // UpdateProfile 只更新资料字段，账号、密码、角色等字段保持原值。

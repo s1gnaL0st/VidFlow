@@ -13,6 +13,9 @@ var ErrSaveAccountFailed = errors.New("failed to save account")
 var ErrUpdateAccountFailed = errors.New("failed to update account")
 var ErrSignAccessTokenFailed = errors.New("failed to sign access token")
 
+const defaultSearchLimit = 10
+const maxSearchLimit = 30
+
 // TokenSigner 是应用层依赖的最小 JWT 能力，账号服务只关心“签发 token”和“过期时间”。
 type TokenSigner interface {
 	SignAccessToken(userID int64, role string) (string, error)
@@ -133,6 +136,32 @@ func (s *Service) GetPublicProfile(ctx context.Context, userID int64) (*Profile,
 	}
 
 	return profileFromUser(user), nil
+}
+
+// SearchProfiles 按账号或昵称搜索正常用户，返回公开资料。
+func (s *Service) SearchProfiles(ctx context.Context, keyword string, excludeUserID int64, limit int) ([]*Profile, error) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return []*Profile{}, nil
+	}
+	if limit <= 0 {
+		limit = defaultSearchLimit
+	}
+	if limit > maxSearchLimit {
+		limit = maxSearchLimit
+	}
+	users, err := s.repo.Search(ctx, keyword, excludeUserID, limit)
+	if err != nil {
+		return nil, ErrLoadAccountFailed
+	}
+	profiles := make([]*Profile, 0, len(users))
+	for _, user := range users {
+		if user == nil {
+			continue
+		}
+		profiles = append(profiles, profileFromUser(user))
+	}
+	return profiles, nil
 }
 
 // UpdateProfile 支持部分更新，nil 表示该字段没有出现在请求体中。
