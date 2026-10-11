@@ -2,6 +2,8 @@
 
 VidFlow 是一个短视频 Feed 与即时通讯融合的内容社交系统。项目覆盖账号、视频发布、Feed 分发、推荐、互动、关系链、通知、IM、审核扩展、监控和容器化部署。
 
+![VidFlow Feed 页面](assets/vidflow-feed.png)
+
 > 项目定位为开源 Feed 系统二次开发，上游参考项目：`https://github.com/LeoninCS/GCFeed`。
 
 ## 核心能力
