@@ -1,7 +1,9 @@
 package infravideo
 
 import (
+	domainoutbox "GCFeed/internal/domain/outbox"
 	domainvideo "GCFeed/internal/domain/video"
+	infraoutbox "GCFeed/internal/infra/persistence/outbox"
 	"context"
 	"errors"
 	"time"
@@ -50,43 +52,60 @@ func EnsureStats(db *gorm.DB) error {
 
 // Save 在同一事务内写入视频记录和初始统计记录。
 func (r *Repository) Save(ctx context.Context, video *domainvideo.Video) error {
-	var model VideoModel
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		model = VideoModel{
-			AuthorID:       video.AuthorID,
-			Title:          video.Title,
-			Description:    video.Description,
-			MediaURL:       video.MediaURL,
-			CoverURL:       video.CoverURL,
-			Status:         video.Status,
-			PublishedAt:    video.PublishedAt,
-			IdempotencyKey: idempotencyKeyPtr(video.IdempotencyKey),
-		}
-
-		if err := tx.Create(&model).Error; err != nil {
-			if isDuplicateKeyError(err) {
-				return domainvideo.ErrDuplicateIdempotencyKey
-			}
-			return err
-		}
-
-		// video_stat 独立存储计数，便于互动接口只更新统计表。
-		stat := VideoStatModel{
-			VideoID:       model.ID,
-			LikeCount:     video.LikeCount,
-			CommentCount:  video.CommentCount,
-			FavoriteCount: video.FavoriteCount,
-		}
-		if err := tx.Create(&stat).Error; err != nil {
-			return err
-		}
-		return nil
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return saveVideo(tx, video)
 	})
-	if err != nil {
+}
+
+// SaveWithOutbox 在同一事务内写入视频、统计记录和待投递事件。
+func (r *Repository) SaveWithOutbox(ctx context.Context, video *domainvideo.Video, factory func(*domainvideo.Video) (*domainoutbox.Event, error)) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := saveVideo(tx, video); err != nil {
+			return err
+		}
+		event, err := factory(video)
+		if err != nil {
+			return err
+		}
+		if event == nil {
+			return domainoutbox.ErrInvalidEvent
+		}
+		model := infraoutbox.ModelFromEvent(event)
+		return tx.Create(&model).Error
+	})
+}
+
+func saveVideo(tx *gorm.DB, video *domainvideo.Video) error {
+	model := VideoModel{
+		AuthorID:       video.AuthorID,
+		Title:          video.Title,
+		Description:    video.Description,
+		MediaURL:       video.MediaURL,
+		CoverURL:       video.CoverURL,
+		Status:         video.Status,
+		PublishedAt:    video.PublishedAt,
+		IdempotencyKey: idempotencyKeyPtr(video.IdempotencyKey),
+	}
+
+	if err := tx.Create(&model).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return domainvideo.ErrDuplicateIdempotencyKey
+		}
 		return err
 	}
 
-	// 写回数据库生成的 ID 和时间字段，保证返回响应包含完整信息。
+	// video_stat 独立存储计数，便于互动接口只更新统计表。
+	stat := VideoStatModel{
+		VideoID:       model.ID,
+		LikeCount:     video.LikeCount,
+		CommentCount:  video.CommentCount,
+		FavoriteCount: video.FavoriteCount,
+	}
+	if err := tx.Create(&stat).Error; err != nil {
+		return err
+	}
+
+	// 写回数据库生成的 ID 和时间字段，保证事件和响应都能拿到完整信息。
 	video.ID = model.ID
 	video.CreatedAt = model.CreatedAt
 	video.UpdatedAt = model.UpdatedAt

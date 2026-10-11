@@ -1,2 +1,4 @@
 .DS_Store
 apps/api/uploads/*
+docs/
+manual-rebuild/

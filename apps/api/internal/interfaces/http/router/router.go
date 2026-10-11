@@ -104,7 +104,9 @@ func Register(g *gin.Engine, cfg *infraconfig.Config, db *sql.DB) error {
 			log.Printf("rabbitmq disabled: %v", err)
 		} else {
 			videoOptions = append(videoOptions, applicationvideo.WithPublishedEventPublisher(rabbitMQ))
+			videoOptions = append(videoOptions, applicationvideo.WithPublishedEventOutbox(cfg.RabbitMQ.VideoExchange, cfg.RabbitMQ.VideoPublishedRouting))
 			exposureOptions = append(exposureOptions, applicationexposure.WithViewEventPublisher(rabbitMQ))
+			exposureOptions = append(exposureOptions, applicationexposure.WithViewEventOutbox(cfg.RabbitMQ.ExposureExchange, cfg.RabbitMQ.ViewEventRecordedRouting))
 			if feedCache != nil {
 				interactionOptions = append(interactionOptions, applicationinteraction.WithAsyncActionPipeline(feedCache, rabbitMQ))
 			}

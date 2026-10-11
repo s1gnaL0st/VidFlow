@@ -1,23 +1,37 @@
 package applicationvideo
 
 import (
+	domainoutbox "GCFeed/internal/domain/outbox"
 	domainvideo "GCFeed/internal/domain/video"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 )
 
 var ErrLoadVideoFailed = errors.New("failed to load video")
 var ErrSaveVideoFailed = errors.New("failed to save video")
 var ErrUpdateVideoFailed = errors.New("failed to update video")
+var ErrBuildPublishedOutboxEventFailed = errors.New("failed to build published outbox event")
+
+const defaultVideoOutboxExchange = "gcfeed.video"
+const defaultVideoOutboxRoutingKey = "video.published"
 
 type Service struct {
-	repo      domainvideo.Repository
-	publisher PublishedEventPublisher
+	repo           domainvideo.Repository
+	publisher      PublishedEventPublisher
+	outboxEnabled  bool
+	outboxExchange string
+	outboxRouting  string
 }
 
 type PublishedEventPublisher interface {
 	PublishVideoPublished(ctx context.Context, event *PublishedEvent) error
+}
+
+type videoOutboxRepository interface {
+	SaveWithOutbox(ctx context.Context, video *domainvideo.Video, factory func(*domainvideo.Video) (*domainoutbox.Event, error)) error
 }
 
 type Option func(*Service)
@@ -39,6 +53,23 @@ func New(repo domainvideo.Repository, options ...Option) *Service {
 func WithPublishedEventPublisher(publisher PublishedEventPublisher) Option {
 	return func(s *Service) {
 		s.publisher = publisher
+	}
+}
+
+// WithPublishedEventOutbox 让视频发布事件先写入数据库 Outbox，再由 Dispatcher 投递。
+func WithPublishedEventOutbox(exchange string, routingKey string) Option {
+	return func(s *Service) {
+		exchange = strings.TrimSpace(exchange)
+		routingKey = strings.TrimSpace(routingKey)
+		if exchange == "" {
+			exchange = defaultVideoOutboxExchange
+		}
+		if routingKey == "" {
+			routingKey = defaultVideoOutboxRoutingKey
+		}
+		s.outboxEnabled = true
+		s.outboxExchange = exchange
+		s.outboxRouting = routingKey
 	}
 }
 
@@ -65,7 +96,16 @@ func (s *Service) CreatePublished(ctx context.Context, authorID int64, title, de
 		return nil, err
 	}
 
-	if err := s.repo.Save(ctx, video); err != nil {
+	savedWithOutbox := false
+	var saveErr error
+	if repo, ok := s.repo.(videoOutboxRepository); ok && s.outboxEnabled {
+		saveErr = repo.SaveWithOutbox(ctx, video, s.newPublishedOutboxEvent)
+		savedWithOutbox = true
+	} else {
+		saveErr = s.repo.Save(ctx, video)
+	}
+	if saveErr != nil {
+		err := saveErr
 		if idempotencyKey != "" && errors.Is(err, domainvideo.ErrDuplicateIdempotencyKey) {
 			// 并发创建可能先查不到、后插入冲突；冲突后再查一次即可返回一致结果。
 			existing, loadErr := s.repo.FindByAuthorAndIdempotencyKey(ctx, authorID, idempotencyKey)
@@ -76,9 +116,33 @@ func (s *Service) CreatePublished(ctx context.Context, authorID int64, title, de
 		}
 		return nil, ErrSaveVideoFailed
 	}
-	s.publishCreatedVideo(ctx, video)
+	if !savedWithOutbox {
+		s.publishCreatedVideo(ctx, video)
+	}
 
 	return &CreateResult{Video: video, Created: true}, nil
+}
+
+func (s *Service) newPublishedOutboxEvent(video *domainvideo.Video) (*domainoutbox.Event, error) {
+	event := NewPublishedEvent(video)
+	if event == nil {
+		return nil, ErrBuildPublishedOutboxEventFailed
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return nil, ErrBuildPublishedOutboxEventFailed
+	}
+	outboxEvent, err := domainoutbox.NewEvent(
+		event.EventID,
+		s.outboxExchange,
+		s.outboxRouting,
+		payload,
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return nil, ErrBuildPublishedOutboxEventFailed
+	}
+	return outboxEvent, nil
 }
 
 func (s *Service) publishCreatedVideo(ctx context.Context, video *domainvideo.Video) {

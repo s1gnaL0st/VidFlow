@@ -7,6 +7,7 @@ import (
 	infrafeed "GCFeed/internal/infra/persistence/feed"
 	infrainteraction "GCFeed/internal/infra/persistence/interaction"
 	inframessage "GCFeed/internal/infra/persistence/message"
+	infraoutbox "GCFeed/internal/infra/persistence/outbox"
 	infraplayback "GCFeed/internal/infra/persistence/playback"
 	infrarelation "GCFeed/internal/infra/persistence/relation"
 	infravideo "GCFeed/internal/infra/persistence/video"
@@ -41,6 +42,7 @@ func autoMigrateModels(db *gorm.DB) error {
 			&infrainteraction.ActionModel{},
 			&infrainteraction.CommentModel{},
 			&inframessage.MessageModel{},
+			&infraoutbox.OutboxModel{},
 			&infraplayback.ConfigModel{},
 			&infraplayback.QoSLogModel{},
 			&infrarelation.FollowModel{},

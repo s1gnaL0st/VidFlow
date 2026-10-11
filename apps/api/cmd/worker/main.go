@@ -9,6 +9,7 @@ import (
 
 	applicationembedding "GCFeed/internal/application/embedding"
 	applicationinteraction "GCFeed/internal/application/interaction"
+	applicationoutbox "GCFeed/internal/application/outbox"
 	applicationvideo "GCFeed/internal/application/video"
 	infracache "GCFeed/internal/infra/cache"
 	infraconfig "GCFeed/internal/infra/config"
@@ -19,6 +20,7 @@ import (
 	infrafeed "GCFeed/internal/infra/persistence/feed"
 	infrainteraction "GCFeed/internal/infra/persistence/interaction"
 	migration "GCFeed/internal/infra/persistence/migration"
+	infraoutbox "GCFeed/internal/infra/persistence/outbox"
 
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -77,6 +79,9 @@ func main() {
 func startWorkers(ctx context.Context, cfg *infraconfig.Config, gormDB *gorm.DB, rabbitMQ *inframq.RabbitMQ) error {
 	redisClient := infracache.NewRedisClient(cfg.Redis)
 	feedCache := infracache.NewFeedCache(redisClient)
+
+	outboxDispatcher := applicationoutbox.New(infraoutbox.New(gormDB), rabbitMQ)
+	go outboxDispatcher.Run(ctx)
 
 	interactionRepo := infrainteraction.New(gormDB)
 	actionWorker := applicationinteraction.NewActionWorker(interactionRepo, rabbitMQ)
