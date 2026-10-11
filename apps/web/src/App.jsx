@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ChatPage from "./ChatPage.jsx";
 
 const TOKEN_KEY = "gcfeed.accessToken";
 const USER_KEY = "gcfeed.user";
@@ -61,7 +62,7 @@ function App() {
     if ((route === "/profile" || route === "/me") && !(token && user)) {
       navigate("/timeline", setRoute);
     }
-    if (route === "/messages" && !(token && user)) {
+    if ((route === "/messages" || route.startsWith("/chat")) && !(token && user)) {
       navigate("/auth", setRoute);
     }
   }, [route, token, user]);
@@ -143,7 +144,7 @@ function App() {
         onNavigate={(path) => navigate(path, setRoute)}
         onLogout={() => logout(session, setRoute)}
       >
-        <PublicProfilePage userID={publicUserID} onNavigate={(path) => navigate(path, setRoute)} />
+        <PublicProfilePage userID={publicUserID} session={session} onNavigate={(path) => navigate(path, setRoute)} />
       </AppShell>
     );
   }
@@ -174,6 +175,21 @@ function App() {
         onLogout={() => logout(session, setRoute)}
       >
         <MessagesPage session={session} onNavigate={(path) => navigate(path, setRoute)} onUnreadChange={refreshUnreadCount} />
+      </AppShell>
+    );
+  }
+
+  if (route.startsWith("/chat")) {
+    return (
+      <AppShell
+        user={user}
+        route={route}
+        authenticated={Boolean(token && user)}
+        unreadCount={unreadCount}
+        onNavigate={(path) => navigate(path, setRoute)}
+        onLogout={() => logout(session, setRoute)}
+      >
+        <ChatPage route={route} session={session} onNavigate={(path) => navigate(path, setRoute)} />
       </AppShell>
     );
   }
@@ -233,13 +249,13 @@ function LoginPage({ session, onNavigate }) {
 
   return (
     <main className="auth-page">
-      <section className="auth-visual" aria-label="GCFeed">
+      <section className="auth-visual" aria-label="VidFlow">
         <div className="auth-preview">
           <img src={image.stage} alt="" />
           <div className="auth-preview-card">
             <span className="material-symbols-outlined">play_arrow</span>
             <div>
-              <strong>GCFeed</strong>
+              <strong>VidFlow</strong>
               <span>16:9 桌面 Feed</span>
             </div>
           </div>
@@ -248,9 +264,9 @@ function LoginPage({ session, onNavigate }) {
       <section className="auth-panel">
         <div className="auth-card">
           <div className="brand-block">
-            <span className="brand-mark">GC</span>
+            <span className="brand-mark">VF</span>
             <div>
-              <h1>登录 GCFeed</h1>
+              <h1>登录 VidFlow</h1>
               <p>连接后端账号、Feed 和个人资料。</p>
             </div>
           </div>
@@ -334,6 +350,10 @@ function AppShell({ children, user, route, authenticated, unreadCount, onNavigat
             <span>消息</span>
             {authenticated && unreadCount > 0 && <span className="nav-badge">{formatBadgeCount(unreadCount)}</span>}
           </button>
+          <button className={`sidebar-link ${route.startsWith("/chat") ? "active" : ""}`} onClick={() => onNavigate(authenticated ? "/chat" : "/auth")}>
+            <span className="material-symbols-outlined filled">forum</span>
+            <span>私信</span>
+          </button>
         </aside>
         {children}
       </div>
@@ -346,7 +366,7 @@ function TopNav({ user, authenticated, unreadCount, onNavigate, onLogout }) {
     <header className="top-nav">
       <div className="top-left">
         <button className="wordmark" onClick={() => onNavigate(authenticated ? "/recommend" : "/timeline")}>
-          GCFeed
+          VidFlow
         </button>
       </div>
       <div className="top-center">
@@ -1833,7 +1853,7 @@ function ProfilePage({ session, onNavigate }) {
   );
 }
 
-function PublicProfilePage({ userID, onNavigate }) {
+function PublicProfilePage({ userID, session, onNavigate }) {
   const [profile, setProfile] = useState(() => readPublicProfile(userID));
   const [profileState, setProfileState] = useState("idle");
   const [videos, setVideos] = useState([]);
@@ -1919,6 +1939,12 @@ function PublicProfilePage({ userID, onNavigate }) {
               作品
             </button>
           </div>
+          {session?.token && Number(session.user?.id) !== Number(userID) && (
+            <button className="primary-button compact" type="button" onClick={() => onNavigate(`/chat/new/${userID}`)}>
+              <span className="material-symbols-outlined">chat</span>
+              发私信
+            </button>
+          )}
           <button className="ghost-button compact public-back-button" type="button" onClick={() => onNavigate("/timeline")}>
             <span className="material-symbols-outlined">home</span>
             最新视频
@@ -2269,6 +2295,7 @@ function normalizeRoute(pathname) {
   if (pathname === "/login") return "/auth";
   if (pathname === "/me") return "/profile";
   if (/^\/users\/\d+$/.test(pathname)) return pathname;
+  if (/^\/chat(?:\/(?:new\/)?\d+)?$/.test(pathname)) return pathname;
   if (["/", "/auth", "/recommend", "/timeline", "/following", "/hotfeed", "/profile", "/upload", "/messages"].includes(pathname)) {
     return pathname;
   }

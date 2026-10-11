@@ -4,6 +4,7 @@ import (
 	applicationaccount "GCFeed/internal/application/account"
 	applicationexposure "GCFeed/internal/application/exposure"
 	applicationfeed "GCFeed/internal/application/feed"
+	applicationim "GCFeed/internal/application/im"
 	applicationinteraction "GCFeed/internal/application/interaction"
 	applicationmessage "GCFeed/internal/application/message"
 	applicationplayback "GCFeed/internal/application/playback"
@@ -18,6 +19,7 @@ import (
 	infraaccount "GCFeed/internal/infra/persistence/account"
 	infraexposure "GCFeed/internal/infra/persistence/exposure"
 	infrafeed "GCFeed/internal/infra/persistence/feed"
+	inframim "GCFeed/internal/infra/persistence/im"
 	infrainteraction "GCFeed/internal/infra/persistence/interaction"
 	inframessage "GCFeed/internal/infra/persistence/message"
 	migration "GCFeed/internal/infra/persistence/migration"
@@ -25,9 +27,11 @@ import (
 	infrarecommendation "GCFeed/internal/infra/persistence/recommendation"
 	infrarelation "GCFeed/internal/infra/persistence/relation"
 	infravideo "GCFeed/internal/infra/persistence/video"
+	infraws "GCFeed/internal/infra/ws"
 	interfaceshttpaccount "GCFeed/internal/interfaces/http/account"
 	interfaceshttpexposure "GCFeed/internal/interfaces/http/exposure"
 	interfaceshttpfeed "GCFeed/internal/interfaces/http/feed"
+	interfaceshttpim "GCFeed/internal/interfaces/http/im"
 	interfaceshttpinteraction "GCFeed/internal/interfaces/http/interaction"
 	interfaceshttpmessage "GCFeed/internal/interfaces/http/message"
 	interfaceshttpmiddleware "GCFeed/internal/interfaces/http/middleware"
@@ -76,6 +80,10 @@ func Register(g *gin.Engine, cfg *infraconfig.Config, db *sql.DB) error {
 	recommendationRepo := infrarecommendation.New(gormDB)
 	recommendationService := applicationrecommendation.New(recommendationRepo)
 	recommendationHandler := interfaceshttprecommendation.New(recommendationService)
+	imRepo := inframim.New(gormDB)
+	imService := applicationim.New(imRepo)
+	imHub := infraws.NewHub(nil)
+	imHandler := interfaceshttpim.New(imService, imHub, jwtManager)
 	feedOptions := []applicationfeed.Option{applicationfeed.WithRecommender(recommendationService)}
 	videoOptions := []applicationvideo.Option{}
 	interactionOptions := []applicationinteraction.Option{}
@@ -85,6 +93,8 @@ func Register(g *gin.Engine, cfg *infraconfig.Config, db *sql.DB) error {
 	if cfg.Redis.Addr != "" {
 		redisClient := infracache.NewRedisClient(cfg.Redis)
 		feedCache = infracache.NewFeedCache(redisClient)
+		imHub = infraws.NewHub(infracache.NewIMPresenceCache(redisClient))
+		imHandler = interfaceshttpim.New(imService, imHub, jwtManager)
 		feedOptions = append(feedOptions, applicationfeed.WithFeedCache(feedCache))
 		interactionOptions = append(interactionOptions, applicationinteraction.WithHotScoreRecorder(feedCache))
 		interactionOptions = append(interactionOptions, applicationinteraction.WithStatCache(feedCache))
@@ -185,6 +195,13 @@ func Register(g *gin.Engine, cfg *infraconfig.Config, db *sql.DB) error {
 	api.GET("/playback-config", authMiddleware, playbackHandler.GetConfig)
 	api.GET("/preload-videos", authMiddleware, playbackHandler.ListPreloadVideos)
 	api.POST("/playback-qos-reports", authMiddleware, playbackHandler.CreateQoSReport)
+	conversations := api.Group("/conversations", authMiddleware)
+	conversations.POST("", imHandler.CreateConversation)
+	conversations.GET("", imHandler.ListConversations)
+	conversations.GET("/:conversationId/messages", imHandler.ListMessages)
+	conversations.POST("/:conversationId/messages", imHandler.SendMessage)
+	conversations.PATCH("/:conversationId/read", imHandler.MarkRead)
+	api.GET("/im/ws", imHandler.WebSocket)
 
 	internal := g.Group("/internal")
 	internal.POST("/recommendation-candidates", recommendationHandler.ListCandidates)

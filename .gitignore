@@ -1,4 +1,6 @@
 .DS_Store
 apps/api/uploads/*
+apps/web/dist/
+apps/web/node_modules/
 docs/
 manual-rebuild/

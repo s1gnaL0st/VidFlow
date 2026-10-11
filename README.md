@@ -1,6 +1,6 @@
-# GCFeed
+# VidFlow
 
-GCFeed 是一个面向短视频场景的 Feed 系统工程。项目用 Go API 单体、React Web 客户端、MySQL、Redis 和 RabbitMQ 承载内容供给、分发、消费、互动和治理链路。
+VidFlow 是一个 Feed 与 IM 融合的内容社交系统。项目用 Go API 单体、React Web 客户端、WebSocket、MySQL、Redis 和 RabbitMQ 承载内容供给、分发、消费、互动、即时通讯和治理链路。
 
 ## 当前状态
 
@@ -12,6 +12,8 @@ GCFeed 是一个面向短视频场景的 Feed 系统工程。项目用 Go API �
 - JWT 登录态。
 - Redis Feed 缓存、热榜和互动计数。
 - RabbitMQ 异步互动落库、视频发布事件和向量任务。
+- 单聊、群聊会话、历史消息、未读数和 WebSocket 实时推送。
+- 可靠事件 Outbox、RabbitMQ Publisher Confirm 和死信重试。
 - React + Vite Web 客户端。
 - 消息中心和播放优化接入。
 - API 流程测试和 Web 生产构建。

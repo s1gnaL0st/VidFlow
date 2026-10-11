@@ -5,6 +5,7 @@ import (
 	infraembedding "GCFeed/internal/infra/persistence/embedding"
 	infraexposure "GCFeed/internal/infra/persistence/exposure"
 	infrafeed "GCFeed/internal/infra/persistence/feed"
+	inframim "GCFeed/internal/infra/persistence/im"
 	infrainteraction "GCFeed/internal/infra/persistence/interaction"
 	inframessage "GCFeed/internal/infra/persistence/message"
 	infraoutbox "GCFeed/internal/infra/persistence/outbox"
@@ -37,6 +38,9 @@ func autoMigrateModels(db *gorm.DB) error {
 			&infravideo.VideoModel{},
 			&infravideo.VideoStatModel{},
 			&infrafeed.InboxModel{},
+			&inframim.ConversationModel{},
+			&inframim.MemberModel{},
+			&inframim.MessageModel{},
 			&infraexposure.ViewEventModel{},
 			&infraexposure.ExposureModel{},
 			&infrainteraction.ActionModel{},
