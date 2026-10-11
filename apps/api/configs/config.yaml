@@ -1,7 +1,7 @@
 port: 8080
 jwt:
   secret: "replace-with-strong-secret"
-  access_ttl: "15m"
+  access_ttl: "24h"
 
 internal:
   token: "replace-with-internal-token"

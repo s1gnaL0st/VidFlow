@@ -1805,6 +1805,11 @@ function ProfilePage({ session, onNavigate }) {
       setStatus("已保存");
       setEditing(false);
     } catch (error) {
+      if (error.status === 401) {
+        session.clearAuth();
+        onNavigate("/auth");
+        return;
+      }
       setStatus(error.message || "保存失败");
     }
   }
@@ -2261,6 +2266,12 @@ function UploadPage({ session, onNavigate }) {
       setStatus("发布成功");
       onNavigate("/profile");
     } catch (error) {
+      if (error.status === 401) {
+        session.clearAuth();
+        onNavigate("/auth");
+        setStatus("登录已过期，请重新登录");
+        return;
+      }
       setStatus(error.message || "发布失败");
     } finally {
       setSubmitting(false);
@@ -2786,7 +2797,9 @@ async function uploadFile(file, kind, token) {
     } catch {
       message = response.statusText || message;
     }
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
