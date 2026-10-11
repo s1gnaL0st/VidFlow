@@ -317,6 +317,11 @@ func (defaultUploadProcessor) ValidateVideo(ctx context.Context, path string) er
 	start := time.Now()
 	metadata, err := probeVideo(ctx, path)
 	if err != nil {
+		if errors.Is(err, errVideoToolUnavailable) {
+			// 本地开发环境可能未安装 ffprobe；生产镜像已经包含 ffmpeg。
+			inframetrics.ObserveVideoProcessing("probe", time.Since(start), nil)
+			return nil
+		}
 		inframetrics.ObserveVideoProcessing("probe", time.Since(start), err)
 		return err
 	}
@@ -328,6 +333,11 @@ func (defaultUploadProcessor) ValidateVideo(ctx context.Context, path string) er
 func (defaultUploadProcessor) Faststart(ctx context.Context, path string) error {
 	start := time.Now()
 	err := faststartVideo(ctx, path)
+	if errors.Is(err, errVideoToolUnavailable) {
+		// 缺少 ffmpeg 时保留原文件，避免阻塞本地开发发布流程。
+		inframetrics.ObserveVideoProcessing("faststart", time.Since(start), nil)
+		return nil
+	}
 	inframetrics.ObserveVideoProcessing("faststart", time.Since(start), err)
 	return err
 }

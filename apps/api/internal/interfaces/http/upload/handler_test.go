@@ -1,6 +1,7 @@
 package interfaceshttpupload
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,5 +67,20 @@ func TestCreateFaststartTempFileUsesMP4Extension(t *testing.T) {
 	}
 	if !strings.HasSuffix(tmpPath, ".faststart.mp4") {
 		t.Fatalf("expected mp4 temp extension, got %s", tmpPath)
+	}
+}
+
+func TestDefaultUploadProcessorSkipsMissingTools(t *testing.T) {
+	t.Setenv("PATH", "")
+	path := filepath.Join(t.TempDir(), "clip.mp4")
+	if err := os.WriteFile(path, []byte("not-a-real-video"), 0o600); err != nil {
+		t.Fatalf("write temp video: %v", err)
+	}
+	processor := defaultUploadProcessor{}
+	if err := processor.ValidateVideo(context.Background(), path); err != nil {
+		t.Fatalf("validate without ffprobe should be skipped: %v", err)
+	}
+	if err := processor.Faststart(context.Background(), path); err != nil {
+		t.Fatalf("faststart without ffmpeg should be skipped: %v", err)
 	}
 }
