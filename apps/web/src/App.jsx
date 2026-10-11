@@ -347,7 +347,7 @@ function AppShell({ children, user, route, authenticated, unreadCount, onNavigat
           ))}
           <button className={`sidebar-link ${route === "/messages" ? "active" : ""}`} onClick={() => onNavigate(authenticated ? "/messages" : "/auth")}>
             <span className="material-symbols-outlined filled">notifications</span>
-            <span>消息</span>
+            <span>通知</span>
             {authenticated && unreadCount > 0 && <span className="nav-badge">{formatBadgeCount(unreadCount)}</span>}
           </button>
           <button className={`sidebar-link ${route.startsWith("/chat") ? "active" : ""}`} onClick={() => onNavigate(authenticated ? "/chat" : "/auth")}>
@@ -1460,7 +1460,7 @@ function MessagesPage({ session, onNavigate, onUnreadChange }) {
             onNavigate("/auth");
             return;
           }
-          setError(loadError.message || "消息加载失败");
+          setError(loadError.message || "通知加载失败");
           setState("error");
         });
     },
@@ -1521,7 +1521,7 @@ function MessagesPage({ session, onNavigate, onUnreadChange }) {
       <section className="messages-header">
         <div>
           <p className="eyebrow">Messages</p>
-          <h1>消息中心</h1>
+          <h1>通知中心</h1>
         </div>
         <div className="messages-actions">
           <span className="messages-count">{unreadCount > 0 ? `${unreadCount} 未读` : "已读完"}</span>
@@ -1539,9 +1539,9 @@ function MessagesPage({ session, onNavigate, onUnreadChange }) {
       <section className="messages-list-wrap">
         {loadingInitial && <PageMessage icon="hourglass_top" title="正在加载消息" />}
         {state === "error" && items.length === 0 && (
-          <PageMessage icon="sync_problem" title={error || "消息加载失败"} action="重试" onAction={() => loadMessages("", false)} />
+          <PageMessage icon="sync_problem" title={error || "通知加载失败"} action="重试" onAction={() => loadMessages("", false)} />
         )}
-        {state === "ready" && items.length === 0 && <PageMessage icon="notifications" title="暂无消息" />}
+        {state === "ready" && items.length === 0 && <PageMessage icon="notifications" title="暂无通知" />}
         {error && items.length > 0 && <p className="form-message">{error}</p>}
         <div className="messages-list">
           {items.map((message) => {
