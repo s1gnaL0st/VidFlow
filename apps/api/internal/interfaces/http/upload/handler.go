@@ -364,7 +364,7 @@ func probeVideo(ctx context.Context, path string) (*probeResult, error) {
 
 	cmd := exec.CommandContext(
 		probeCtx,
-		"ffprobe",
+		videoToolPath("FFPROBE_PATH", "ffprobe"),
 		"-v",
 		"error",
 		"-show_entries",
@@ -440,21 +440,36 @@ func faststartVideo(ctx context.Context, path string) error {
 	_ = tmp.Close()
 	defer os.Remove(tmpPath)
 
-	ffmpegCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	ffmpegCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(
 		ffmpegCtx,
-		"ffmpeg",
+		videoToolPath("FFMPEG_PATH", "ffmpeg"),
 		"-y",
 		"-i",
 		path,
 		"-map",
-		"0",
-		"-c",
-		"copy",
+		"0:v:0",
+		"-map",
+		"0:a?",
+		"-c:v",
+		"libx264",
+		"-preset",
+		"veryfast",
+		"-crf",
+		"23",
+		"-pix_fmt",
+		"yuv420p",
+		"-c:a",
+		"aac",
+		"-b:a",
+		"128k",
+		"-max_muxing_queue_size",
+		"1024",
 		"-movflags",
 		"+faststart",
+		"-dn",
 		"-f",
 		"mp4",
 		tmpPath,
@@ -476,6 +491,13 @@ func faststartVideo(ctx context.Context, path string) error {
 func createFaststartTempFile(path string) (*os.File, error) {
 	targetDir := filepath.Dir(path)
 	return os.CreateTemp(targetDir, "*.faststart.mp4")
+}
+
+func videoToolPath(envName string, fallback string) string {
+	if configured := strings.TrimSpace(os.Getenv(envName)); configured != "" {
+		return configured
+	}
+	return fallback
 }
 
 func writeUploadValidationError(c *gin.Context, err error) {

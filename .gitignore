@@ -2,5 +2,6 @@
 apps/api/uploads/*
 apps/web/dist/
 apps/web/node_modules/
+.tools/
 docs/
 manual-rebuild/
