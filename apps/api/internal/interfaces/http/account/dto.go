@@ -51,3 +51,12 @@ type publicUserProfileResponse struct {
 	FollowerCount  int    `json:"follower_count"`
 	WorkCount      int    `json:"work_count"`
 }
+
+// 用户搜索响应保留账号名，便于区分昵称相同的用户。
+type userSearchProfileResponse struct {
+	ID        int64  `json:"id"`
+	Account   string `json:"account"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
+	Bio       string `json:"bio"`
+}

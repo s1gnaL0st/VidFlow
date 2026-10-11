@@ -134,9 +134,15 @@ func (h *Handler) Search(c *gin.Context) {
 		writeProfileError(c, err)
 		return
 	}
-	items := make([]publicUserProfileResponse, 0, len(profiles))
+	items := make([]userSearchProfileResponse, 0, len(profiles))
 	for _, profile := range profiles {
-		items = append(items, publicProfileResponse(profile))
+		items = append(items, userSearchProfileResponse{
+			ID:        profile.ID,
+			Account:   profile.Account,
+			Nickname:  profile.Nickname,
+			AvatarURL: profile.AvatarURL,
+			Bio:       profile.Bio,
+		})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }

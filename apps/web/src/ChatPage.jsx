@@ -13,7 +13,10 @@ function ChatPage({ route, session, onNavigate }) {
   const [error, setError] = useState("");
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
-  const [groupMembers, setGroupMembers] = useState("");
+  const [groupMemberQuery, setGroupMemberQuery] = useState("");
+  const [groupMemberResults, setGroupMemberResults] = useState([]);
+  const [groupMemberState, setGroupMemberState] = useState("idle");
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -90,6 +93,35 @@ function ChatPage({ route, session, onNavigate }) {
       setSelectedID(routeConversationID);
     }
   }, [route]);
+
+  useEffect(() => {
+    if (!groupOpen) return undefined;
+    const keyword = groupMemberQuery.trim();
+    if (!keyword) {
+      setGroupMemberResults([]);
+      setGroupMemberState("idle");
+      return undefined;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setGroupMemberState("loading");
+      apiRequest(`/api/users/search?q=${encodeURIComponent(keyword)}&limit=10`, { token: session.token })
+        .then((data) => {
+          if (!active) return;
+          setGroupMemberResults(Array.isArray(data.items) ? data.items : []);
+          setGroupMemberState("ready");
+        })
+        .catch(() => {
+          if (!active) return;
+          setGroupMemberResults([]);
+          setGroupMemberState("error");
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [groupMemberQuery, groupOpen, session.token]);
 
   useEffect(() => {
     if (!session.token) return undefined;
@@ -204,10 +236,7 @@ function ChatPage({ route, session, onNavigate }) {
   async function createGroup(event) {
     event.preventDefault();
     const title = groupTitle.trim();
-    const memberIDs = groupMembers
-      .split(/[,\s]+/)
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isFinite(value) && value > 0);
+    const memberIDs = selectedGroupMembers.map((member) => member.id);
     if (!title || memberIDs.length === 0 || creatingGroup) return;
     setCreatingGroup(true);
     setError("");
@@ -224,7 +253,9 @@ function ChatPage({ route, session, onNavigate }) {
       const conversationID = Number(data.conversation?.id || 0);
       setGroupOpen(false);
       setGroupTitle("");
-      setGroupMembers("");
+      setGroupMemberQuery("");
+      setGroupMemberResults([]);
+      setSelectedGroupMembers([]);
       await loadConversations();
       if (conversationID > 0) onNavigate(`/chat/${conversationID}`);
     } catch (createError) {
@@ -232,6 +263,17 @@ function ChatPage({ route, session, onNavigate }) {
     } finally {
       setCreatingGroup(false);
     }
+  }
+
+  function addGroupMember(member) {
+    if (!member || selectedGroupMembers.some((item) => Number(item.id) === Number(member.id))) return;
+    setSelectedGroupMembers((items) => [...items, member]);
+    setGroupMemberQuery("");
+    setGroupMemberResults([]);
+  }
+
+  function removeGroupMember(userID) {
+    setSelectedGroupMembers((items) => items.filter((item) => Number(item.id) !== Number(userID)));
   }
 
   return (
@@ -348,15 +390,51 @@ function ChatPage({ route, session, onNavigate }) {
               <input value={groupTitle} onChange={(event) => setGroupTitle(event.target.value)} maxLength={128} />
             </label>
             <label>
-              成员用户 ID
-              <textarea
-                value={groupMembers}
-                onChange={(event) => setGroupMembers(event.target.value)}
-                placeholder="例如 12, 18, 25"
+              搜索成员
+              <input
+                value={groupMemberQuery}
+                onChange={(event) => setGroupMemberQuery(event.target.value)}
+                placeholder="输入账号或昵称"
               />
             </label>
+            {groupMemberState === "loading" && <p className="chat-muted">搜索中...</p>}
+            {groupMemberState === "error" && <p className="form-message">用户搜索失败</p>}
+            {groupMemberState === "ready" && groupMemberResults.length === 0 && <p className="chat-muted">没有找到用户</p>}
+            {groupMemberResults.length > 0 && (
+              <div className="group-member-results">
+                {groupMemberResults.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => addGroupMember(member)}
+                    disabled={selectedGroupMembers.some((item) => Number(item.id) === Number(member.id))}
+                  >
+                    <img src={member.avatar_url || fallbackAvatar} alt="" />
+                    <span>
+                      <strong>{member.nickname || `用户_${member.id}`}</strong>
+                      <small>@{member.account || member.id}</small>
+                    </span>
+                    <span className="material-symbols-outlined">add</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedGroupMembers.length > 0 && (
+              <div className="selected-group-members">
+                {selectedGroupMembers.map((member) => (
+                  <button key={member.id} type="button" onClick={() => removeGroupMember(member.id)}>
+                    {member.nickname || `用户_${member.id}`}
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {error && <p className="form-message">{error}</p>}
-            <button className="primary-button" type="submit" disabled={creatingGroup || !groupTitle.trim()}>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={creatingGroup || !groupTitle.trim() || selectedGroupMembers.length === 0}
+            >
               {creatingGroup ? "创建中" : "创建群聊"}
             </button>
           </form>
